@@ -1,11 +1,11 @@
-use std::{error::Error, fs};
+use std::{env, error::Error, fs};
 
 pub fn run(config: MinConfig) -> Result<(), Box<dyn Error>> {
     let file_contents = match fs::read_to_string(&config.file_path) {
         Ok(contents) => contents,
         Err(err) => return Err(Box::new(err)),
     };
-    for result in search(&config.query, &file_contents) {
+    for result in search(&config.query, &file_contents, config.ignore_case) {
         println!("{result}")
     }
     Ok(())
@@ -14,6 +14,7 @@ pub fn run(config: MinConfig) -> Result<(), Box<dyn Error>> {
 pub struct MinConfig {
     query: String,
     file_path: String,
+    ignore_case: bool,
 }
 
 impl MinConfig {
@@ -32,30 +33,52 @@ impl MinConfig {
         Ok(MinConfig {
             query: query.clone(),
             file_path: file_path.clone(),
+            ignore_case: env::var("IGNORE_CASE").is_ok(),
         })
     }
 }
 
-fn search<'a>(query: &str, content: &'a str) -> Vec<&'a str> {
+fn search<'a>(query: &str, content: &'a str, ignore_case: bool) -> Vec<&'a str> {
     content
         .lines()
-        .filter(|line| line.contains(query))
+        .filter(|line| {
+            if ignore_case {
+                line.to_lowercase().contains(&query.to_lowercase())
+            } else {
+                line.contains(query)
+            }
+        })
         .collect()
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::search;
+    use super::*;
 
     #[test]
-    fn test_search() {
+    fn case_sensitive() {
+        let query = "duct";
         let contents = "\
 Rust:
 safe, fast, productive.
 Pick three.
-";
-        let query = "du";
-        let search_results = search(query, contents);
-        assert_eq!(vec!["safe, fast, productive."], search_results);
+Duct tape.";
+
+        assert_eq!(
+            vec!["safe, fast, productive."],
+            search(query, contents, false)
+        );
+    }
+
+    #[test]
+    fn case_insensitive() {
+        let query = "rUsT";
+        let contents = "\
+Rust:
+safe, fast, productive.
+Pick three.
+Trust me.";
+
+        assert_eq!(vec!["Rust:", "Trust me."], search(query, contents, true));
     }
 }
