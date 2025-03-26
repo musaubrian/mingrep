@@ -1,14 +1,13 @@
 use std::{error::Error, fs};
 
 pub fn run(config: MinConfig) -> Result<(), Box<dyn Error>> {
-    let _file_contents = match fs::read_to_string(&config.file_path) {
+    let file_contents = match fs::read_to_string(&config.file_path) {
         Ok(contents) => contents,
         Err(err) => return Err(Box::new(err)),
     };
-    println!(
-        "File => {}\nQuery => {}\n---\n{_file_contents}\n---",
-        config.query, config.file_path
-    );
+    for result in search(&config.query, &file_contents) {
+        println!("{result}")
+    }
     Ok(())
 }
 
@@ -34,5 +33,29 @@ impl MinConfig {
             query: query.clone(),
             file_path: file_path.clone(),
         })
+    }
+}
+
+fn search<'a>(query: &str, content: &'a str) -> Vec<&'a str> {
+    content
+        .lines()
+        .filter(|line| line.contains(query))
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::search;
+
+    #[test]
+    fn test_search() {
+        let contents = "\
+Rust:
+safe, fast, productive.
+Pick three.
+";
+        let query = "du";
+        let search_results = search(query, contents);
+        assert_eq!(vec!["safe, fast, productive."], search_results);
     }
 }
